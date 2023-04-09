@@ -309,12 +309,12 @@ pub struct Lap {
 #[derive(Default, Debug)]
 #[allow(dead_code)]
 pub struct Controls {
-    accelerator: u8,
-    brake: u8,
-    clutch: u8,
-    handbrake: u8,
-    gear: u8,
-    steer: i8,
+    pub accelerator: u8,
+    pub brake: u8,
+    pub clutch: u8,
+    pub handbrake: u8,
+    pub gear: u8,
+    pub steer: i8,
 }
 
 #[derive(Default, Debug)]

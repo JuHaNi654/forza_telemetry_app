@@ -18,12 +18,18 @@ fn main() {
         }))
         .add_plugin(Forza7Plugin)
         .add_startup_system(setup)
-        .add_system(update_telemetry)
+        .add_systems((update_speed, update_rpm, update_gear))
         .run();
 }
 
 #[derive(Component)]
 struct Speed;
+
+#[derive(Component)]
+struct RPM;
+
+#[derive(Component)]
+struct Gear;
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn(Camera2dBundle::default());
@@ -52,12 +58,111 @@ fn section_2(builder: &mut ChildBuilder, font: Handle<Font>) {
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center,
+                gap: Size::all(Val::Px(10.0)),
                 ..Default::default()
             },
             ..Default::default()
         })
         .with_children(|builder| {
-            render_speed(builder, font);
+            render_rpm(builder, font.clone());
+            render_speed(builder, font.clone());
+            render_gear(builder, font.clone());
+        });
+}
+
+fn render_gear(builder: &mut ChildBuilder, font: Handle<Font>) {
+    let text_style = TextStyle {
+        font,
+        font_size: 92.0,
+        color: Color::BLACK,
+    };
+
+    builder
+        .spawn(NodeBundle {
+            style: Style {
+                size: Size::new(Val::Percent(100.), Val::Px(100.)),
+                ..default()
+            },
+            background_color: BackgroundColor(Color::hex("d9d9d9").unwrap()),
+            ..default()
+        })
+        .with_children(|builder| {
+            builder
+                .spawn(NodeBundle {
+                    style: Style {
+                        size: Size::new(Val::Percent(65.0), Val::Percent(100.0)),
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|builder| {
+                    builder.spawn(TextBundle::from_section("Gear:", text_style.clone()));
+                });
+
+            builder
+                .spawn(NodeBundle {
+                    style: Style {
+                        size: Size::new(Val::Percent(45.0), Val::Percent(100.)),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                })
+                .with_children(|builder| {
+                    builder.spawn((TextBundle::from_section("N", text_style.clone()), Gear));
+                });
+        });
+}
+
+fn render_rpm(builder: &mut ChildBuilder, font: Handle<Font>) {
+    let text_style = TextStyle {
+        font,
+        font_size: 92.0,
+        color: Color::BLACK,
+    };
+
+    builder
+        .spawn(NodeBundle {
+            style: Style {
+                size: Size::new(Val::Percent(100.), Val::Px(100.)),
+                ..default()
+            },
+            background_color: BackgroundColor(Color::hex("d9d9d9").unwrap()),
+            ..default()
+        })
+        .with_children(|builder| {
+            builder
+                .spawn(NodeBundle {
+                    style: Style {
+                        size: Size::new(Val::Percent(65.0), Val::Percent(100.0)),
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|builder| {
+                    builder.spawn((TextBundle::from_section("0000", text_style.clone()), RPM));
+                });
+
+            builder
+                .spawn(NodeBundle {
+                    style: Style {
+                        size: Size::new(Val::Percent(45.0), Val::Percent(100.)),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                })
+                .with_children(|builder| {
+                    builder.spawn(TextBundle::from_section("RPM", text_style.clone()));
+                });
         });
 }
 
@@ -84,14 +189,17 @@ fn render_speed(builder: &mut ChildBuilder, font: Handle<Font>) {
                 })
                 .with_children(|builder| {
                     // TODO Check Text2dBundle
-                    builder.spawn((TextBundle::from_section(
-                        "000",
-                        TextStyle {
-                            font: font.clone(),
-                            font_size: 154.0,
-                            color: Color::BLACK,
-                        },
-                    ), Speed));
+                    builder.spawn((
+                        TextBundle::from_section(
+                            "000",
+                            TextStyle {
+                                font: font.clone(),
+                                font_size: 154.0,
+                                color: Color::BLACK,
+                            },
+                        ),
+                        Speed,
+                    ));
                 });
 
             builder
@@ -135,14 +243,29 @@ fn render_speed(builder: &mut ChildBuilder, font: Handle<Font>) {
         });
 }
 
+fn update_speed(mut reader: EventReader<StreamEvent>, mut query: Query<&mut Text, With<RPM>>) {
+    let mut text = query.single_mut();
+    for event in reader.iter() {
+        text.sections[0].value = event.telemetry.engine.rpm.round().to_string();
+    }
+}
 
-fn update_telemetry(
-    mut reader: EventReader<StreamEvent>,
-    mut query: Query<&mut Text, With<Speed>>
-) {
+fn update_rpm(mut reader: EventReader<StreamEvent>, mut query: Query<&mut Text, With<Speed>>) {
     let mut text = query.single_mut();
     for event in reader.iter() {
         text.sections[0].value = (event.telemetry.engine.speed * 3.6).round().to_string();
     }
 }
 
+fn update_gear(mut reader: EventReader<StreamEvent>, mut query: Query<&mut Text, With<Gear>>) {
+    let mut text = query.single_mut();
+    for event in reader.iter() {
+        if event.telemetry.controls.gear == 0 && event.telemetry.is_race_on == 1 {
+            text.sections[0].value = "R".to_string();
+        } else if event.telemetry.is_race_on == 0 {
+            text.sections[0].value = "N".to_string();
+        } else {
+            text.sections[0].value = event.telemetry.controls.gear.to_string();
+        }
+    }
+}
